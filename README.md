@@ -219,6 +219,14 @@ MIT License
 ## 📝 更新日誌
 
 ### 最新更新 - 界面大幅簡化優化
+- **UI顏色統一**：調整月曆頁面顏色配色，與Dashboard保持一致
+  - 主背景色：從純黑`#000000`改為`#1C2526`，與Dashboard一致
+  - 卡片背景：使用Dashboard的`#2E3A3B`替代純黑色
+  - 次要文字：統一使用`#A9A9A9`，與Dashboard一致
+  - 邊框顏色：使用Dashboard的`#4A5657`提升視覺層次
+  - 週標題區域：使用卡片背景色，增強區域劃分
+  - 活動項目：採用Dashboard卡片樣式，圓角和padding保持一致
+  - 整體視覺風格：完全與Dashboard融合，提升應用一致性
 - **依賴修復**：徹底解決Metro bundler和模組解析錯誤
   - 完全重新安裝所有node_modules和依賴包
   - 修復 `react-native-gesture-handler` 模組解析錯誤
