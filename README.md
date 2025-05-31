@@ -219,6 +219,12 @@ MIT License
 ## 📝 更新日誌
 
 ### 最新更新 - 界面大幅簡化優化
+- **依賴修復**：徹底解決Metro bundler和模組解析錯誤
+  - 完全重新安裝所有node_modules和依賴包
+  - 修復 `react-native-gesture-handler` 模組解析錯誤
+  - 統一所有依賴版本，確保與Expo SDK 53兼容
+  - 清除Metro快取，解決bundler錯誤
+  - 確保從正確目錄(FitnessApp)運行Expo命令
 - **錯誤修復**：解決顏色選擇功能中的樣式錯誤和依賴衝突
   - 修復 `getUseOfValueInStyleWarning` 樣式錯誤
   - 解決 React Native Reanimated 版本衝突 (統一使用 3.17.4)
