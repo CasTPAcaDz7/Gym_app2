@@ -266,7 +266,15 @@ MIT License
 
 ## 📝 更新日誌
 
-### 最新更新 - Dashboard 數據同步優化
+### 最新更新 - 預設頁面優化
+- **用戶體驗改進**：將應用程式預設頁面設置為 Dashboard
+- **實現方式**：
+  - 修改 `AppNavigator.js` 中的 Tab.Navigator 配置
+  - 添加 `initialRouteName="Dashboard"` 屬性
+  - 重新排列 Tab.Screen 順序，將 Dashboard 移至首位
+  - 確保應用程式啟動時直接顯示功能豐富的 Dashboard 頁面
+
+### Dashboard 數據同步優化
 - **修復問題**：Dashboard 中 Progress 卡片顯示的卡路里與飲食記錄頁面數據不同步
 - **優化內容**：
   - 新增 `loadDietData()` 函數從 AsyncStorage 讀取實際飲食數據
