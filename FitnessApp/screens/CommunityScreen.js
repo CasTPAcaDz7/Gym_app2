@@ -180,53 +180,89 @@ export default function CommunityScreen({ navigation }) {
     console.log('Book session with:', coach.name);
   };
 
-  // 渲染頂部標題（添加模式切換按鈕）
-  const renderHeader = () => (
-    <View style={styles.headerContainer}>
-      <Text style={styles.headerTitle}>社群</Text>
-      <TouchableOpacity style={styles.modeToggleButton} onPress={handleModeToggle}>
-        <MaterialCommunityIcons 
-          name={isCoachMode ? 'school' : 'teach'} 
-          size={20} 
-          color="#ffffff" 
-        />
-        <Text style={styles.modeToggleText}>
-          {isCoachMode ? '學生' : '教練'}
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-
-  // 渲染個人資訊按鈕（取代搜尋框）
-  const renderUserProfileSection = () => {
+  // 渲染頂部個人檔案（原標題位置）
+  const renderTopProfile = () => {
     const displaySubtitle = isCoachMode ? '管理您的教練檔案和課程' : '查看和編輯您的個人檔案';
     
     return (
-      <View style={styles.profileSectionContainer}>
-        <TouchableOpacity style={styles.profileButton} onPress={handleUserProfilePress}>
-          <View style={styles.profileButtonLeft}>
-            <View style={styles.userAvatarContainer}>
+      <View style={styles.topProfileContainer}>
+        <TouchableOpacity style={styles.topProfileButton} onPress={handleUserProfilePress}>
+          <View style={styles.topProfileLeft}>
+            <View style={styles.topUserAvatarContainer}>
               {userData.avatar && userData.avatar.startsWith('file://') ? (
                 <Image 
                   source={{ uri: userData.avatar }} 
-                  style={styles.userAvatarImage}
+                  style={styles.topUserAvatarImage}
                 />
               ) : (
                 <MaterialCommunityIcons 
                   name={userData.avatar || "account-circle"} 
-                  size={50} 
+                  size={40} 
                   color="#00CED1" 
                 />
               )}
             </View>
-            <View style={styles.profileButtonContent}>
-              <Text style={styles.userName}>{userData.name}</Text>
-              <Text style={styles.userId}>ID: Nah</Text>
-              <Text style={styles.profileButtonSubtitle}>{displaySubtitle}</Text>
+            <View style={styles.topProfileContent}>
+              <Text style={styles.topUserName}>{userData.name}</Text>
+              <Text style={styles.topUserId}>ID: Nah</Text>
             </View>
           </View>
-          <MaterialCommunityIcons name="chevron-right" size={28} color="#A9A9A9" />
+          <TouchableOpacity style={styles.modeToggleButton} onPress={handleModeToggle}>
+            <MaterialCommunityIcons 
+              name={isCoachMode ? 'school' : 'teach'} 
+              size={18} 
+              color="#ffffff" 
+            />
+            <Text style={styles.modeToggleText}>
+              {isCoachMode ? '學生' : '教練'}
+            </Text>
+          </TouchableOpacity>
         </TouchableOpacity>
+      </View>
+    );
+  };
+
+  // 渲染廣告區域（原個人檔案位置）
+  const renderAdvertisementSection = () => {
+    return (
+      <View style={styles.advertisementContainer}>
+        <View style={styles.adCard}>
+          <View style={styles.adHeader}>
+            <MaterialCommunityIcons 
+              name="bullhorn" 
+              size={24} 
+              color="#FF6B6B" 
+            />
+            <Text style={styles.adTitle}>健身推廣</Text>
+            <View style={styles.adBadge}>
+              <Text style={styles.adBadgeText}>AD</Text>
+            </View>
+          </View>
+          
+          <View style={styles.adContent}>
+            <View style={styles.adImagePlaceholder}>
+              <MaterialCommunityIcons 
+                name="dumbbell" 
+                size={32} 
+                color="#00CED1" 
+              />
+            </View>
+            <View style={styles.adTextContent}>
+              <Text style={styles.adMainText}>新會員優惠！</Text>
+              <Text style={styles.adSubText}>加入我們的健身計劃，享受專業指導</Text>
+              <Text style={styles.adPrice}>首月只需 ¥99</Text>
+            </View>
+          </View>
+          
+          <TouchableOpacity style={styles.adButton}>
+            <Text style={styles.adButtonText}>立即了解</Text>
+            <MaterialCommunityIcons 
+              name="arrow-right" 
+              size={16} 
+              color="#FFFFFF" 
+            />
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -431,8 +467,8 @@ export default function CommunityScreen({ navigation }) {
         contentContainerStyle={styles.scrollViewContent}
         showsVerticalScrollIndicator={false}
       >
-        {renderHeader()}
-        {renderUserProfileSection()}
+        {renderTopProfile()}
+        {renderAdvertisementSection()}
         {renderFunctionBar()}
         {isCoachMode ? renderStudentsList() : renderMatchedCoaches()}
       </ScrollView>
@@ -453,25 +489,12 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   
-  // 頂部用戶資訊按鈕樣式
-  headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  // 頂部個人檔案樣式
+  topProfileContainer: {
     marginTop: 16,
-    marginBottom: 20,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-
-  // 個人資訊按鈕樣式
-  profileSectionContainer: {
     marginBottom: 30,
   },
-  profileButton: {
+  topProfileButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#2E3A3B',
@@ -487,12 +510,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  profileButtonLeft: {
+  topProfileLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    flex: 1,
   },
-  userAvatarContainer: {
+  topUserAvatarContainer: {
     width: 50,
     height: 50,
     borderRadius: 25,
@@ -500,29 +524,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     overflow: 'hidden',
   },
-  userAvatarImage: {
+  topUserAvatarImage: {
     width: 50,
     height: 50,
     borderRadius: 25,
   },
-  profileButtonContent: {
+  topProfileContent: {
     flex: 1,
   },
-  userName: {
+  topUserName: {
     color: '#ffffff',
     fontSize: 18,
     fontWeight: '700',
     marginBottom: 2,
   },
-  userId: {
+  topUserId: {
     color: '#00CED1',
     fontSize: 14,
     fontWeight: '500',
-    marginBottom: 4,
   },
-  profileButtonSubtitle: {
-    color: '#A9A9A9',
+  modeToggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 206, 209, 0.2)',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 6,
+  },
+  modeToggleText: {
+    color: '#ffffff',
     fontSize: 12,
+    fontWeight: '600',
   },
 
   // 功能欄樣式（原類別網格）
@@ -681,21 +714,94 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // 模式切換按鈕樣式
-  modeToggleButton: {
+  // 廣告區域樣式
+  advertisementContainer: {
+    marginBottom: 30,
+  },
+  adCard: {
+    backgroundColor: '#2E3A3B',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#4A5657',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  adHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2E3A3B',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 6,
-    borderWidth: 1,
-    borderColor: '#00CED1',
+    marginBottom: 12,
   },
-  modeToggleText: {
+  adTitle: {
+    fontSize: 18,
+    fontWeight: '600',
     color: '#ffffff',
+    marginLeft: 8,
+    flex: 1,
+  },
+  adBadge: {
+    backgroundColor: '#FF6B6B',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  adBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  adContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 16,
+  },
+  adImagePlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 206, 209, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 206, 209, 0.3)',
+  },
+  adTextContent: {
+    flex: 1,
+  },
+  adMainText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 6,
+  },
+  adSubText: {
     fontSize: 14,
+    color: '#A9A9A9',
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  adPrice: {
+    fontSize: 16,
+    color: '#00CED1',
+    fontWeight: '700',
+  },
+  adButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#00CED1',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  adButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
     fontWeight: '600',
   },
 
