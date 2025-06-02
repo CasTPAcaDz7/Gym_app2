@@ -12,26 +12,27 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 const { width } = Dimensions.get('window');
 
 const SemicirclePopup = ({ isVisible, onChatPress, onCoachManagePress }) => {
-  const [slideAnim] = useState(new Animated.Value(60)); // 開始時隱藏在底部工具欄後面
+  const [slideAnim] = useState(new Animated.Value(80)); // 開始時完全隱藏在底部工具欄後面
 
   useEffect(() => {
     if (isVisible) {
-      // 彈出動畫 - 從底部工具欄後面彈出
+      // 進入動畫 - 從底部工具欄後面向上升起
       Animated.spring(slideAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 120,
-        friction: 7,
-        duration: 300,
-      }).start();
-    } else {
-      // 隱藏動畫 - 向下滑出畫面
-      Animated.spring(slideAnim, {
-        toValue: 120, // 向下滑出畫面
+        toValue: 0, // 升到完全顯示位置
         useNativeDriver: true,
         tension: 100,
-        friction: 8,
-        duration: 280,
+        friction: 6,
+        duration: 350,
+        delay: 100, // 稍微延遲讓頁面切換完成
+      }).start();
+    } else {
+      // 離開動畫 - 向下收回畫面
+      Animated.spring(slideAnim, {
+        toValue: 150, // 向下滑出畫面更遠
+        useNativeDriver: true,
+        tension: 80,
+        friction: 7,
+        duration: 300,
       }).start();
     }
   }, [isVisible, slideAnim]);

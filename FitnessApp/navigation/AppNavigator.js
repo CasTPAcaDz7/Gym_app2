@@ -241,7 +241,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
         // 進入Community頁面時，稍微延遲顯示半圓形工具欄
         setTimeout(() => {
           setShowSemicircle(true);
-        }, 150);
+        }, 100); // 減少延遲讓動畫更及時
       } else {
         // 離開Community頁面時，立即開始隱藏動畫
         setShowSemicircle(false);
