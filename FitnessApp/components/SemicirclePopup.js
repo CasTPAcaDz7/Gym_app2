@@ -25,13 +25,13 @@ const SemicirclePopup = ({ isVisible, onChatPress, onCoachManagePress }) => {
         duration: 300,
       }).start();
     } else {
-      // 隱藏動畫 - 滑回底部工具欄後面
+      // 隱藏動畫 - 向下滑出畫面
       Animated.spring(slideAnim, {
-        toValue: 60,
+        toValue: 120, // 向下滑出畫面
         useNativeDriver: true,
-        tension: 120,
-        friction: 7,
-        duration: 250,
+        tension: 100,
+        friction: 8,
+        duration: 280,
       }).start();
     }
   }, [isVisible, slideAnim]);
