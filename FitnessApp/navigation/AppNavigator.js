@@ -230,11 +230,24 @@ function CommunityStack() {
 function CustomTabBar({ state, descriptors, navigation }) {
   const [showSemicircle, setShowSemicircle] = React.useState(false);
 
-  // 檢查當前是否在Community頁面
+  // 檢查當前是否在Community頁面，並確保動畫正確執行
   React.useEffect(() => {
     const currentRoute = state.routes[state.index];
-    setShowSemicircle(currentRoute.name === 'Community');
-  }, [state]);
+    const isCommunityPage = currentRoute.name === 'Community';
+    
+    // 使用 setTimeout 確保動畫時序正確
+    if (isCommunityPage !== showSemicircle) {
+      if (isCommunityPage) {
+        // 進入Community頁面時，稍微延遲顯示半圓形工具欄
+        setTimeout(() => {
+          setShowSemicircle(true);
+        }, 150);
+      } else {
+        // 離開Community頁面時，立即開始隱藏動畫
+        setShowSemicircle(false);
+      }
+    }
+  }, [state, showSemicircle]);
 
   const handleChatPress = () => {
     navigation.navigate('Community', { screen: 'ChatRoom' });
@@ -246,7 +259,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
 
   return (
     <View style={{ position: 'relative' }}>
-      {/* 半圓形彈出組件 */}
+      {/* 半圓形彈出組件 - 始終渲染以確保動畫完整 */}
       <SemicirclePopup
         isVisible={showSemicircle}
         onChatPress={handleChatPress}
@@ -263,6 +276,8 @@ function CustomTabBar({ state, descriptors, navigation }) {
           paddingBottom: 8,
           paddingTop: 8,
           height: 70,
+          position: 'relative',
+          zIndex: 1, // 確保TabBar在半圓形工具欄之下
         }}
       >
         {state.routes.map((route, index) => {
@@ -278,7 +293,16 @@ function CustomTabBar({ state, descriptors, navigation }) {
             });
 
             if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
+              // 如果正在離開Community頁面，確保半圓形工具欄先開始隱藏動畫
+              if (state.routes[state.index].name === 'Community' && route.name !== 'Community') {
+                setShowSemicircle(false);
+                // 稍微延遲導航以確保動畫流暢
+                setTimeout(() => {
+                  navigation.navigate(route.name);
+                }, 50);
+              } else {
+                navigation.navigate(route.name);
+              }
             }
           };
 

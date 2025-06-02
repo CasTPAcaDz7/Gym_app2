@@ -12,29 +12,29 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 const { width } = Dimensions.get('window');
 
 const SemicirclePopup = ({ isVisible, onChatPress, onCoachManagePress }) => {
-  const [slideAnim] = useState(new Animated.Value(100)); // 開始時在底部隱藏
+  const [slideAnim] = useState(new Animated.Value(60)); // 開始時隱藏在底部工具欄後面
 
   useEffect(() => {
     if (isVisible) {
-      // 彈出動畫
+      // 彈出動畫 - 從底部工具欄後面彈出
       Animated.spring(slideAnim, {
         toValue: 0,
         useNativeDriver: true,
-        tension: 100,
-        friction: 8,
+        tension: 120,
+        friction: 7,
+        duration: 300,
       }).start();
     } else {
-      // 隱藏動畫
+      // 隱藏動畫 - 滑回底部工具欄後面
       Animated.spring(slideAnim, {
-        toValue: 100,
+        toValue: 60,
         useNativeDriver: true,
-        tension: 100,
-        friction: 8,
+        tension: 120,
+        friction: 7,
+        duration: 250,
       }).start();
     }
   }, [isVisible, slideAnim]);
-
-  if (!isVisible) return null;
 
   return (
     <Animated.View
@@ -42,8 +42,10 @@ const SemicirclePopup = ({ isVisible, onChatPress, onCoachManagePress }) => {
         styles.container,
         {
           transform: [{ translateY: slideAnim }],
+          opacity: isVisible ? 1 : 0, // 添加透明度變化
         },
       ]}
+      pointerEvents={isVisible ? 'auto' : 'none'} // 當不可見時禁用點擊
     >
       {/* 半圓形背景 */}
       <View style={styles.semicircle}>
@@ -55,7 +57,7 @@ const SemicirclePopup = ({ isVisible, onChatPress, onCoachManagePress }) => {
         >
           <MaterialCommunityIcons 
             name="chat" 
-            size={24} 
+            size={22} 
             color="#FFFFFF" 
           />
           <Text style={styles.buttonText}>聊天室</Text>
@@ -69,14 +71,14 @@ const SemicirclePopup = ({ isVisible, onChatPress, onCoachManagePress }) => {
         >
           <MaterialCommunityIcons 
             name="account-supervisor" 
-            size={24} 
+            size={22} 
             color="#FFFFFF" 
           />
           <Text style={styles.buttonText}>管理教練</Text>
         </TouchableOpacity>
 
-        {/* 中央裝飾點 */}
-        <View style={styles.centerDot} />
+        {/* 中央分隔線 */}
+        <View style={styles.centerDivider} />
       </View>
     </Animated.View>
   );
@@ -85,65 +87,76 @@ const SemicirclePopup = ({ isVisible, onChatPress, onCoachManagePress }) => {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 60, // 在工具欄上方
+    bottom: 70, // 緊貼在原工具欄上方
     left: 0,
     right: 0,
     alignItems: 'center',
     zIndex: 1000,
   },
   semicircle: {
-    width: width * 0.8,
-    height: 80,
+    width: width, // 與螢幕同寬，匹配原工具欄
+    height: 50, // 更窄的高度
     backgroundColor: '#00CED1',
-    borderTopLeftRadius: (width * 0.8) / 2,
-    borderTopRightRadius: (width * 0.8) / 2,
+    borderTopLeftRadius: width / 2, // 保持半圓形狀
+    borderTopRightRadius: width / 2,
     position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 40,
-    paddingTop: 15,
+    justifyContent: 'space-around', // 均勻分佈按鈕
+    paddingHorizontal: 60, // 調整內邊距
+    paddingTop: 8,
+    paddingBottom: 2,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: -3,
+      height: -4,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 8,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 12,
+    // 添加邊框效果，與原工具欄呼應
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
   },
   actionButton: {
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 25,
-    padding: 12,
-    minWidth: 80,
+    borderRadius: 20,
+    padding: 10,
+    minWidth: 90,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
+    // 添加內陰影效果
+    shadowColor: 'rgba(0, 0, 0, 0.2)',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
   },
   leftButton: {
-    marginLeft: 10,
+    marginRight: 20,
   },
   rightButton: {
-    marginRight: 10,
+    marginLeft: 20,
   },
   buttonText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
-    marginTop: 4,
+    marginTop: 3,
     textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
-  centerDot: {
+  centerDivider: {
     position: 'absolute',
-    top: 20,
+    top: 15,
     left: '50%',
-    marginLeft: -3,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    marginLeft: -0.5,
+    width: 1,
+    height: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
   },
 });
 
