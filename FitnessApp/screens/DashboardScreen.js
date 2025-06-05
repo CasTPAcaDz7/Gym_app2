@@ -14,6 +14,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useStats, useFoodRecords, useExerciseRecords, useWeightRecords } from '../hooks/useStorage';
 import { useFocusEffect } from '@react-navigation/native';
+import { useActivities } from '../hooks/useStorage';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -28,6 +29,10 @@ export default function DashboardScreen({ navigation }) {
   const { todayFoods, getTodayTotalCalories } = useFoodRecords();
   const { todayExercises, getTodayTotalCaloriesBurned } = useExerciseRecords();
   const { latestWeight } = useWeightRecords();
+  const { loadActivitiesByDate } = useActivities();
+
+  // 添加活動數據狀態
+  const [weekActivities, setWeekActivities] = useState({});
 
   useEffect(() => {
     loadDashboardData();
@@ -37,6 +42,7 @@ export default function DashboardScreen({ navigation }) {
   useFocusEffect(
     React.useCallback(() => {
       refreshStats();
+      loadWeekActivities(); // 添加活動數據刷新
     }, [refreshStats])
   );
 
@@ -74,6 +80,9 @@ export default function DashboardScreen({ navigation }) {
 
       generateDailyComment();
 
+      // 載入週活動數據
+      await loadWeekActivities();
+
       await new Promise(resolve => setTimeout(resolve, 500)); // 減少載入時間
 
     } catch (error) {
@@ -82,6 +91,48 @@ export default function DashboardScreen({ navigation }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  // 載入週活動數據
+  const loadWeekActivities = async () => {
+    try {
+      const today = new Date();
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(today.getDate() - today.getDay());
+      
+      const activitiesMap = {};
+      
+      // 為本週每一天載入活動
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(startOfWeek);
+        date.setDate(startOfWeek.getDate() + i);
+        const dateKey = date.toDateString();
+        
+        try {
+          const activities = await loadActivitiesByDate(date);
+          activitiesMap[dateKey] = activities || [];
+        } catch (err) {
+          console.error('Load week activities error:', err);
+          activitiesMap[dateKey] = [];
+        }
+      }
+      
+      setWeekActivities(activitiesMap);
+    } catch (error) {
+      console.error('載入週活動數據失敗:', error);
+    }
+  };
+
+  // 獲取指定日期的活動顏色列表（去重且最多5個）
+  const getActivityColorsForDate = (date) => {
+    const dateKey = date.toDateString();
+    const activities = weekActivities[dateKey] || [];
+    
+    // 提取顏色並去重
+    const colors = [...new Set(activities.map(activity => activity.color || '#00CED1'))];
+    
+    // 限制最多5個顏色
+    return colors.slice(0, 5);
   };
 
   // 獲取飲食數據
@@ -131,36 +182,52 @@ export default function DashboardScreen({ navigation }) {
     <View style={styles.weeklyCalendarCard}>
       <View style={styles.calendarHeader}>
         <View style={styles.weekContainer}>
-          {currentWeek.map((day, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.dayContainer,
-                day.isToday && styles.todayContainer,
-              ]}
-              onPress={() => {
-                // 跳轉到Calendar tab並傳遞選中的日期
-                navigation.getParent()?.navigate('Calendar', {
-                  screen: 'CalendarMain',
-                  params: { selectedDate: day.fullDate.toISOString().split('T')[0] }
-                });
-              }}
-              activeOpacity={0.7}
-            >
-              <Text style={[
-                styles.dayLabel,
-                day.isToday && styles.todayText,
-              ]}>
-                {day.day}
-              </Text>
-              <Text style={[
-                styles.dateLabel,
-                day.isToday && styles.todayText,
-              ]}>
-                {day.date}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {currentWeek.map((day, index) => {
+            const activityColors = getActivityColorsForDate(day.fullDate);
+            
+            return (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.dayContainer,
+                  day.isToday && styles.todayContainer,
+                ]}
+                onPress={() => {
+                  // 跳轉到Calendar tab並傳遞選中的日期
+                  navigation.getParent()?.navigate('Calendar', {
+                    screen: 'CalendarMain',
+                    params: { selectedDate: day.fullDate.toISOString().split('T')[0] }
+                  });
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={[
+                  styles.dayLabel,
+                  day.isToday && styles.todayText,
+                ]}>
+                  {day.day}
+                </Text>
+                <Text style={[
+                  styles.dateLabel,
+                  day.isToday && styles.todayText,
+                ]}>
+                  {day.date}
+                </Text>
+                
+                {/* 活動顏色指示點 */}
+                {activityColors.length > 0 && (
+                  <View style={styles.weekActivityDotsContainer}>
+                    {activityColors.map((color, colorIndex) => (
+                      <View 
+                        key={colorIndex} 
+                        style={[styles.weekActivityColorDot, { backgroundColor: color }]} 
+                      />
+                    ))}
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
     </View>
@@ -383,6 +450,19 @@ const styles = StyleSheet.create({
   todayText: {
     color: '#000000',
     fontWeight: 'bold',
+  },
+  weekActivityDotsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 6,
+    minHeight: 12,
+  },
+  weekActivityColorDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginHorizontal: 1,
   },
   
   // Workout Table Styles

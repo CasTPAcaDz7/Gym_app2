@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  Animated,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -15,6 +16,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export default function CommunityScreen({ navigation }) {
   const [selectedFunction, setSelectedFunction] = useState(null);
   const [isCoachMode, setIsCoachMode] = useState(false); // 新增：模式切換狀態，false為學生模式，true為教練模式
+  
+  // 動畫值用於開關掣
+  const switchAnimation = useRef(new Animated.Value(0)).current;
   
   // 用戶資料 - 從AsyncStorage讀取
   const [userData, setUserData] = useState({
@@ -28,7 +32,8 @@ export default function CommunityScreen({ navigation }) {
   // 功能欄數據（原教練類別改為功能欄）
   const functions = [
     { id: 1, name: '尋找教練', icon: 'account-search', color: '#00CED1' },
-    { id: 2, name: '健身論壇', icon: 'forum', color: '#FF6B6B' },
+    { id: 2, name: '管理教練', icon: 'account-tie', color: '#FF6B6B' },
+    { id: 3, name: 'Forum', icon: 'forum', color: '#4CAF50' },
   ];
 
   // 教練模式功能欄
@@ -36,46 +41,6 @@ export default function CommunityScreen({ navigation }) {
     { id: 1, name: '我的學生', icon: 'account-group', color: '#00CED1' },
     { id: 2, name: '課程管理', icon: 'calendar-clock', color: '#FF6B6B' },
     { id: 3, name: '收入統計', icon: 'chart-line', color: '#4CAF50' },
-  ];
-
-  // 模擬已匹配教練數據
-  const mockCoaches = [
-    {
-      id: 1,
-      name: '張健身',
-      category: '私人教練',
-      rating: 4.8,
-      avatar: 'https://randomuser.me/api/portraits/men/1.jpg',
-      specialties: ['重量訓練', '減脂'],
-      lastSession: '2025-06-15',
-      hourlyRate: 500,
-      experience: 5,
-      isMatched: true,
-    },
-    {
-      id: 2,
-      name: '李瑜伽',
-      category: '瑜伽導師',
-      rating: 4.9,
-      avatar: 'https://randomuser.me/api/portraits/women/2.jpg',
-      specialties: ['哈達瑜伽', '冥想'],
-      lastSession: '2025-06-10',
-      hourlyRate: 400,
-      experience: 8,
-      isMatched: true,
-    },
-    {
-      id: 3,
-      name: '王營養師',
-      category: '營養師',
-      rating: 4.7,
-      avatar: 'https://randomuser.me/api/portraits/women/3.jpg',
-      specialties: ['運動營養', '體重管理'],
-      lastSession: '2025-06-12',
-      hourlyRate: 600,
-      experience: 6,
-      isMatched: true,
-    },
   ];
 
   // 模擬學生數據（教練模式用）
@@ -112,8 +77,6 @@ export default function CommunityScreen({ navigation }) {
     },
   ];
 
-  const [matchedCoaches] = useState(mockCoaches); // 現在mockCoaches已經定義了
-
   useEffect(() => {
     loadUserData();
     
@@ -148,7 +111,9 @@ export default function CommunityScreen({ navigation }) {
     if (func.name === '尋找教練') {
       // 實際應用中這裡會調用API搜索教練
       console.log('Searching for coaches...');
-    } else if (func.name === '健身論壇') {
+    } else if (func.name === '管理教練') {
+      console.log('Navigate to Coach Management');
+    } else if (func.name === 'Forum') {
       handleForumPress();
     }
   };
@@ -159,6 +124,12 @@ export default function CommunityScreen({ navigation }) {
     console.log('Navigate to Forum');
   };
 
+  // 處理聊天室按鈕點擊
+  const handleChatPress = () => {
+    // 跳轉到聊天室頁面
+    console.log('Navigate to Chat Room');
+  };
+
   // 個人資訊按鈕處理函數
   const handleUserProfilePress = () => {
     navigation.navigate('Profile');
@@ -166,18 +137,17 @@ export default function CommunityScreen({ navigation }) {
 
   // 模式切換處理函數
   const handleModeToggle = () => {
-    setIsCoachMode(!isCoachMode);
+    const newMode = !isCoachMode;
+    setIsCoachMode(newMode);
     setSelectedFunction(null); // 切換模式時重置選中的功能
-  };
-
-  // 處理教練詳情
-  const handleCoachDetails = (coach) => {
-    console.log('View coach details:', coach.name);
-  };
-
-  // 處理預約課程
-  const handleBookSession = (coach) => {
-    console.log('Book session with:', coach.name);
+    
+    // 動畫切換
+    Animated.spring(switchAnimation, {
+      toValue: newMode ? 1 : 0,
+      useNativeDriver: false,
+      tension: 100,
+      friction: 8,
+    }).start();
   };
 
   // 渲染頂部個人檔案（原標題位置）
@@ -186,6 +156,49 @@ export default function CommunityScreen({ navigation }) {
     
     return (
       <View style={styles.topProfileContainer}>
+        <View style={styles.topControls}>
+          <TouchableOpacity style={styles.switchContainer} onPress={handleModeToggle}>
+            <View style={styles.switchTrack}>
+              <Animated.View style={[
+                styles.switchThumb, 
+                {
+                  transform: [{
+                    translateX: switchAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 26],
+                    })
+                  }]
+                },
+                isCoachMode ? styles.switchThumbRight : styles.switchThumbLeft
+              ]}>
+                <MaterialCommunityIcons 
+                  name={isCoachMode ? 'teach' : 'school'} 
+                  size={14} 
+                  color="#ffffff" 
+                />
+              </Animated.View>
+            </View>
+            <View style={styles.switchLabels}>
+              <Text style={[
+                styles.switchLabel, 
+                !isCoachMode && styles.activeSwitchLabel
+              ]}>學生</Text>
+              <Text style={[
+                styles.switchLabel, 
+                isCoachMode && styles.activeSwitchLabel
+              ]}>教練</Text>
+            </View>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.chatButton} onPress={handleChatPress}>
+            <MaterialCommunityIcons 
+              name="chat" 
+              size={20} 
+              color="#ffffff" 
+            />
+          </TouchableOpacity>
+        </View>
+        
         <TouchableOpacity style={styles.topProfileButton} onPress={handleUserProfilePress}>
           <View style={styles.topProfileLeft}>
             <View style={styles.topUserAvatarContainer}>
@@ -207,16 +220,6 @@ export default function CommunityScreen({ navigation }) {
               <Text style={styles.topUserId}>ID: Nah</Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.modeToggleButton} onPress={handleModeToggle}>
-            <MaterialCommunityIcons 
-              name={isCoachMode ? 'school' : 'teach'} 
-              size={18} 
-              color="#ffffff" 
-            />
-            <Text style={styles.modeToggleText}>
-              {isCoachMode ? '學生' : '教練'}
-            </Text>
-          </TouchableOpacity>
         </TouchableOpacity>
       </View>
     );
@@ -290,7 +293,7 @@ export default function CommunityScreen({ navigation }) {
               <View style={[styles.functionIcon, { backgroundColor: func.color + '20' }]}>
                 <MaterialCommunityIcons
                   name={func.icon}
-                  size={28}
+                  size={24}
                   color={selectedFunction === func.id ? '#00CED1' : func.color}
                 />
               </View>
@@ -334,62 +337,6 @@ export default function CommunityScreen({ navigation }) {
 
     return <View style={styles.starsContainer}>{stars}</View>;
   };
-
-  // 渲染已匹配教練列表
-  const renderMatchedCoaches = () => (
-    <View style={styles.coachesSection}>
-      <Text style={styles.sectionTitle}>我的教練</Text>
-      {matchedCoaches && matchedCoaches.length > 0 ? (
-        matchedCoaches.map((coach) => (
-          <View key={coach.id} style={styles.coachCard}>
-            <View style={styles.coachHeader}>
-              <View style={styles.avatarContainer}>
-                <MaterialCommunityIcons name="account-circle" size={50} color="#00CED1" />
-              </View>
-              <View style={styles.coachInfo}>
-                <Text style={styles.coachName}>{coach.name}</Text>
-                <Text style={styles.coachCategory}>{coach.category}</Text>
-                <View style={styles.ratingContainer}>
-                  {renderStars(coach.rating)}
-                  <Text style={styles.ratingText}>{coach.rating}</Text>
-                </View>
-                <Text style={styles.lastSession}>上次課程: {coach.lastSession}</Text>
-              </View>
-            </View>
-            
-            <View style={styles.specialtiesContainer}>
-              {coach.specialties && coach.specialties.map((specialty, index) => (
-                <View key={index} style={styles.specialtyTag}>
-                  <Text style={styles.specialtyText}>{specialty}</Text>
-                </View>
-              ))}
-            </View>
-
-            <View style={styles.coachActions}>
-              <TouchableOpacity
-                style={[styles.actionButton, styles.detailsButton]}
-                onPress={() => handleCoachDetails(coach)}
-              >
-                <Text style={styles.detailsButtonText}>查看詳情</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionButton, styles.bookButton]}
-                onPress={() => handleBookSession(coach)}
-              >
-                <Text style={styles.bookButtonText}>預約課程</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))
-      ) : (
-        <View style={styles.emptyState}>
-          <MaterialCommunityIcons name="account-search" size={60} color="#A9A9A9" />
-          <Text style={styles.emptyStateText}>尚未匹配任何教練</Text>
-          <Text style={styles.emptyStateSubtext}>點擊上方類別開始尋找合適的教練</Text>
-        </View>
-      )}
-    </View>
-  );
 
   // 渲染學生列表（教練模式）
   const renderStudentsList = () => (
@@ -470,7 +417,7 @@ export default function CommunityScreen({ navigation }) {
         {renderTopProfile()}
         {renderAdvertisementSection()}
         {renderFunctionBar()}
-        {isCoachMode ? renderStudentsList() : renderMatchedCoaches()}
+        {isCoachMode ? renderStudentsList() : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -493,22 +440,27 @@ const styles = StyleSheet.create({
   topProfileContainer: {
     marginTop: 16,
     marginBottom: 30,
+    position: 'relative',
+  },
+  topControls: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    zIndex: 1,
+    paddingTop: 16,
   },
   topProfileButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2E3A3B',
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    borderWidth: 2,
-    borderColor: '#00CED1',
+    backgroundColor: 'transparent',
+    borderRadius: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 16,
+    paddingRight: 100,
     gap: 8,
-    elevation: 2,
-    shadowColor: '#00CED1',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
   topProfileLeft: {
     flexDirection: 'row',
@@ -543,19 +495,61 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  modeToggleButton: {
-    flexDirection: 'row',
+  switchContainer: {
+    flexDirection: 'column',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 206, 209, 0.2)',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
     gap: 6,
   },
-  modeToggleText: {
-    color: '#ffffff',
-    fontSize: 12,
+  switchTrack: {
+    width: 50,
+    height: 24,
+    backgroundColor: '#4A5657',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  switchThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'absolute',
+    top: 2,
+    left: 2,
+  },
+  switchThumbLeft: {
+    backgroundColor: '#00CED1',
+  },
+  switchThumbRight: {
+    backgroundColor: '#FF6B6B',
+  },
+  switchLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: 50,
+    marginTop: 4,
+    paddingHorizontal: 2,
+  },
+  switchLabel: {
+    color: '#A9A9A9',
+    fontSize: 10,
     fontWeight: '600',
+    textAlign: 'center',
+    flex: 1,
+  },
+  activeSwitchLabel: {
+    color: '#00CED1',
+  },
+  chatButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 20,
+    marginTop: -2,
   },
 
   // 功能欄樣式（原類別網格）
@@ -570,32 +564,33 @@ const styles = StyleSheet.create({
   },
   functionBar: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    gap: 16,
+    justifyContent: 'space-between',
+    gap: 12,
   },
   functionCard: {
     flex: 1,
     backgroundColor: '#2E3A3B',
     borderRadius: 16,
-    padding: 24,
+    padding: 20,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#4A5657',
+    minWidth: 0,
   },
   selectedFunctionCard: {
     borderColor: '#00CED1',
     backgroundColor: '#2E3A3B',
   },
   functionIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   functionName: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#ffffff',
     textAlign: 'center',
     fontWeight: '600',

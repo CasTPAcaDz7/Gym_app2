@@ -7,7 +7,9 @@ import {
   Dimensions,
   StatusBar,
   SafeAreaView,
-  ScrollView
+  ScrollView,
+  Alert,
+  Animated
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -20,8 +22,22 @@ export default function CalendarScreen({ route }) {
   const [selectedDate, setSelectedDate] = useState(new Date()); // 新增選擇的日期狀態
   const [selectedDateActivities, setSelectedDateActivities] = useState([]);
   const [monthActivities, setMonthActivities] = useState({}); // 儲存整個月的活動數據
+  const [weekActivities, setWeekActivities] = useState({});
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+  const [selectedActivityIds, setSelectedActivityIds] = useState([]);
   const navigation = useNavigation();
-  const { loadActivitiesByDate, loading, error } = useActivities();
+  const { loadActivitiesByDate, deleteActivity, loading, error } = useActivities();
+
+  // 添加動畫狀態
+  const slideAnimation = useState(new Animated.Value(0))[0];
+
+  // 確保動畫值與多選模式狀態同步
+  useEffect(() => {
+    // 當多選模式狀態變化時，確保動畫值正確
+    if (!isMultiSelectMode) {
+      slideAnimation.setValue(0);
+    }
+  }, [isMultiSelectMode]);
 
   // 中文星期標籤
   const weekDays = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
@@ -89,10 +105,44 @@ export default function CalendarScreen({ route }) {
     }
   }, [route?.params?.selectedDate]);
 
+  // 處理 refresh 參數，當從新增活動頁面返回時立即刷新數據
+  useEffect(() => {
+    if (route?.params?.refresh) {
+      // 如果同時有 selectedDate 參數，先設置日期再刷新
+      if (route?.params?.selectedDate) {
+        const passedDate = new Date(route.params.selectedDate);
+        setSelectedDate(passedDate);
+        setCurrentDate(passedDate);
+        // 稍微延遲刷新，確保日期已更新
+        setTimeout(() => {
+          loadDateActivities(passedDate);
+          loadMonthActivities();
+        }, 100);
+      } else {
+        loadDateActivities(selectedDate);
+        loadMonthActivities();
+      }
+      // 清除參數，避免重複觸發
+      navigation.setParams({ refresh: false, selectedDate: null });
+    }
+  }, [route?.params?.refresh, route?.params?.selectedDate, selectedDate, loadDateActivities, loadMonthActivities, navigation]);
+
   // 獲取指定日期的活動數量
   const getActivitiesCountForDate = (date) => {
     const dateKey = date.toDateString();
     return (monthActivities[dateKey] || []).length;
+  };
+
+  // 獲取指定日期的活動顏色列表（去重且最多5個）
+  const getActivityColorsForDate = (date) => {
+    const dateKey = date.toDateString();
+    const activities = monthActivities[dateKey] || [];
+    
+    // 提取顏色並去重
+    const colors = [...new Set(activities.map(activity => activity.color || '#00CED1'))];
+    
+    // 限制最多5個顏色
+    return colors.slice(0, 5);
   };
 
   // 獲取活動圖標和顏色
@@ -196,6 +246,145 @@ export default function CalendarScreen({ route }) {
     navigation.navigate('AddActivity', { selectedDate });
   };
 
+  // 處理編輯活動
+  const handleEditActivity = (activity) => {
+    // 如果是多選模式，處理選擇邏輯
+    if (isMultiSelectMode) {
+      toggleActivitySelection(activity.id);
+      return;
+    }
+    
+    // 導航到編輯活動頁面，傳入活動數據
+    navigation.navigate('AddActivity', { 
+      selectedDate,
+      editActivity: activity,
+      isEdit: true
+    });
+  };
+
+  // 切換多選模式
+  const toggleMultiSelectMode = () => {
+    const newMode = !isMultiSelectMode;
+    
+    // 停止當前動畫
+    slideAnimation.stopAnimation(() => {
+      // 設置初始值和目標值
+      const fromValue = newMode ? 0 : 1;
+      const toValue = newMode ? 1 : 0;
+      
+      // 確保從正確的值開始
+      slideAnimation.setValue(fromValue);
+      
+      // 更新狀態
+      setIsMultiSelectMode(newMode);
+      setSelectedActivityIds([]);
+      
+      // 執行動畫
+      Animated.timing(slideAnimation, {
+        toValue: toValue,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+    });
+  };
+
+  // 切換活動選擇狀態
+  const toggleActivitySelection = (activityId) => {
+    setSelectedActivityIds(prev => {
+      if (prev.includes(activityId)) {
+        return prev.filter(id => id !== activityId);
+      } else {
+        return [...prev, activityId];
+      }
+    });
+  };
+
+  // 批量刪除選中的活動
+  const handleBatchDelete = async () => {
+    if (selectedActivityIds.length === 0) {
+      Alert.alert('提示', '請先選擇要刪除的活動');
+      return;
+    }
+
+    console.log('準備批量刪除的活動 IDs:', selectedActivityIds);
+    console.log('當前選中日期的活動:', selectedDateActivities);
+
+    Alert.alert(
+      '確認刪除',
+      `確定要刪除選中的 ${selectedActivityIds.length} 個活動嗎？此操作無法復原。`,
+      [
+        { text: '取消', style: 'cancel' },
+        { 
+          text: '刪除', 
+          style: 'destructive', 
+          onPress: async () => {
+            try {
+              console.log('開始批量刪除活動:', selectedActivityIds);
+              
+              let successCount = 0;
+              let failedCount = 0;
+              
+              // 順序執行刪除操作，避免併發問題
+              for (const activityId of selectedActivityIds) {
+                try {
+                  console.log('正在刪除活動:', activityId);
+                  const result = await deleteActivity(activityId);
+                  console.log('刪除結果:', result);
+                  
+                  if (result) {
+                    successCount++;
+                    console.log('刪除成功:', activityId);
+                  } else {
+                    failedCount++;
+                    console.log('刪除失敗:', activityId, '結果為 false');
+                  }
+                } catch (err) {
+                  console.error('刪除活動時出錯:', activityId, err);
+                  failedCount++;
+                }
+                
+                // 添加小延遲避免過快操作
+                await new Promise(resolve => setTimeout(resolve, 100));
+              }
+              
+              console.log('批量刪除完成，成功:', successCount, '失敗:', failedCount);
+              
+              // 退出多選模式並重置動畫
+              setIsMultiSelectMode(false);
+              setSelectedActivityIds([]);
+              
+              // 重置動畫值
+              slideAnimation.setValue(0);
+              
+              // 延遲刷新數據，確保刪除操作完成
+              setTimeout(async () => {
+                console.log('開始刷新數據...');
+                try {
+                  await loadDateActivities(selectedDate);
+                  await loadMonthActivities();
+                  console.log('數據刷新完成');
+                } catch (err) {
+                  console.error('刷新數據時出錯:', err);
+                }
+              }, 200);
+              
+              if (failedCount === 0) {
+                Alert.alert('成功', `已成功刪除 ${successCount} 個活動`);
+              } else if (successCount === 0) {
+                Alert.alert('失敗', '所有活動刪除失敗，請重試');
+              } else {
+                Alert.alert('部分成功', `成功刪除 ${successCount} 個活動，${failedCount} 個活動刪除失敗`);
+              }
+            } catch (err) {
+              console.error('Batch delete error:', err);
+              Alert.alert('錯誤', '批量刪除失敗，請重試');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   // 渲染活動列表
   const renderActivities = () => {
     const isSelectedToday = isToday(selectedDate);
@@ -205,47 +394,143 @@ export default function CalendarScreen({ route }) {
         <View style={styles.activitiesHeader}>
           <Text style={styles.activitiesTitle}>
             {isSelectedToday ? '今日活動' : `${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日活動`}
+            {isMultiSelectMode && selectedActivityIds.length > 0 && (
+              <Text style={styles.selectedCountText}> ({selectedActivityIds.length} 已選)</Text>
+            )}
           </Text>
-          <TouchableOpacity 
-            style={styles.addButton}
-            onPress={handleAddActivity}
-            activeOpacity={0.7}
-          >
-            <MaterialCommunityIcons 
-              name="plus" 
-              size={20} 
-              color="#ffffff" 
-            />
-          </TouchableOpacity>
+          
+          <View style={styles.headerButtons}>
+            {isMultiSelectMode ? (
+              <>
+                {selectedActivityIds.length > 0 && (
+                  <TouchableOpacity 
+                    style={styles.deleteButton}
+                    onPress={handleBatchDelete}
+                    activeOpacity={0.7}
+                  >
+                    <MaterialCommunityIcons 
+                      name="delete" 
+                      size={18} 
+                      color="#ffffff" 
+                    />
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity 
+                  style={styles.cancelButton}
+                  onPress={toggleMultiSelectMode}
+                  activeOpacity={0.7}
+                >
+                  <MaterialCommunityIcons 
+                    name="close" 
+                    size={18} 
+                    color="#ffffff" 
+                  />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                {selectedDateActivities.length > 0 && (
+                  <TouchableOpacity 
+                    style={styles.moreButton}
+                    onPress={toggleMultiSelectMode}
+                    activeOpacity={0.7}
+                  >
+                    <MaterialCommunityIcons 
+                      name="dots-horizontal" 
+                      size={20} 
+                      color="#A9A9A9" 
+                    />
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity 
+                  style={styles.addButton}
+                  onPress={handleAddActivity}
+                  activeOpacity={0.7}
+                >
+                  <MaterialCommunityIcons 
+                    name="plus" 
+                    size={20} 
+                    color="#ffffff" 
+                  />
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
         </View>
         
         <ScrollView style={styles.activitiesScrollView} showsVerticalScrollIndicator={false}>
           {selectedDateActivities.length > 0 ? (
-            selectedDateActivities.map((activity) => (
-              <View key={activity.id} style={styles.activityItem}>
-                <View style={styles.activityIcon}>
-                  <MaterialCommunityIcons 
-                    name={getActivityIcon(activity)} 
-                    size={20} 
-                    color={activity.color || '#FF4444'}
-                  />
-                </View>
-                <View style={styles.activityContent}>
-                  <Text style={styles.activityTitle}>{activity.title}</Text>
-                  <Text style={styles.activityTime}>
-                    {activity.isAllDay 
-                      ? '全天' 
-                      : `${activity.startTime?.hour || 0}:${(activity.startTime?.minute || 0).toString().padStart(2, '0')}`
-                    }
-                  </Text>
-                </View>
-                <View style={[styles.activityType, { backgroundColor: (activity.color || '#FF4444') + '20' }]}>
-                  <Text style={[styles.activityTypeText, { color: activity.color || '#FF4444' }]}>
-                    {getActivityTypeLabel(activity)}
-                  </Text>
-                </View>
-              </View>
-            ))
+            selectedDateActivities.map((activity) => {
+              const animatedMarginLeft = slideAnimation.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 40], // 向右移動40像素為復選框讓出空間
+              });
+              
+              return (
+                <TouchableOpacity
+                  key={activity.id} 
+                  style={[
+                    styles.activityItem,
+                    isMultiSelectMode && selectedActivityIds.includes(activity.id) && styles.selectedActivityItem
+                  ]}
+                  onPress={() => handleEditActivity(activity)}
+                  activeOpacity={0.7}
+                >
+                  {isMultiSelectMode && (
+                    <Animated.View 
+                      style={[
+                        styles.checkboxContainer,
+                        {
+                          opacity: slideAnimation,
+                          transform: [{
+                            translateX: slideAnimation.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [-40, 0], // 復選框從左邊滑入
+                            })
+                          }]
+                        }
+                      ]}
+                    >
+                      <MaterialCommunityIcons 
+                        name={selectedActivityIds.includes(activity.id) ? "checkbox-marked" : "checkbox-blank-outline"} 
+                        size={24} 
+                        color={selectedActivityIds.includes(activity.id) ? "#00CED1" : "#A9A9A9"} 
+                      />
+                    </Animated.View>
+                  )}
+                  <Animated.View 
+                    style={[
+                      styles.activityContentContainer,
+                      {
+                        marginLeft: isMultiSelectMode ? animatedMarginLeft : 0,
+                      }
+                    ]}
+                  >
+                    <View style={styles.activityIcon}>
+                      <MaterialCommunityIcons 
+                        name={getActivityIcon(activity)} 
+                        size={20} 
+                        color={activity.color || '#FF4444'}
+                      />
+                    </View>
+                    <View style={styles.activityContent}>
+                      <Text style={styles.activityTitle}>{activity.title}</Text>
+                      <Text style={styles.activityTime}>
+                        {activity.isAllDay 
+                          ? '全天' 
+                          : `${activity.startTime?.hour || 0}:${(activity.startTime?.minute || 0).toString().padStart(2, '0')}`
+                        }
+                      </Text>
+                    </View>
+                    <View style={[styles.activityType, { backgroundColor: (activity.color || '#FF4444') + '20' }]}>
+                      <Text style={[styles.activityTypeText, { color: activity.color || '#FF4444' }]}>
+                        {getActivityTypeLabel(activity)}
+                      </Text>
+                    </View>
+                  </Animated.View>
+                </TouchableOpacity>
+              );
+            })
           ) : (
             <View style={styles.noActivitiesContainer}>
               <MaterialCommunityIcons name="calendar-blank-outline" size={40} color="#666666" />
@@ -266,7 +551,7 @@ export default function CalendarScreen({ route }) {
     const selected = isSelectedDate(date);
     const currentMonth = isCurrentMonth(date);
     const sunday = isSunday(date);
-    const activitiesCount = getActivitiesCountForDate(date);
+    const activityColors = getActivityColorsForDate(date);
 
     return (
       <TouchableOpacity
@@ -290,9 +575,16 @@ export default function CalendarScreen({ route }) {
             {date.getDate()}
           </Text>
           
-          {/* 活動指示點 */}
-          {activitiesCount > 0 && (
-            <View style={styles.activityDot} />
+          {/* 活動顏色指示點 */}
+          {activityColors.length > 0 && (
+            <View style={styles.activityDotsContainer}>
+              {activityColors.map((color, colorIndex) => (
+                <View 
+                  key={colorIndex} 
+                  style={[styles.activityColorDot, { backgroundColor: color }]} 
+                />
+              ))}
+            </View>
           )}
         </View>
       </TouchableOpacity>
@@ -475,14 +767,17 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: 'bold',
   },
-  activityDot: {
+  activityDotsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  activityColorDot: {
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#00CED1',
-    position: 'absolute',
-    bottom: 2,
-    alignSelf: 'center',
+    marginHorizontal: 1,
   },
   // 活動區域樣式
   activitiesContainer: {
@@ -509,21 +804,21 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '600',
   },
-  addButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#00CED1',
-    justifyContent: 'center',
+  headerButtons: {
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#00CED1',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+  },
+  selectedCountText: {
+    fontSize: 12,
+    color: '#A9A9A9',
+    marginLeft: 4,
+  },
+  deleteButton: {
+    padding: 6,
+    marginRight: 6,
+  },
+  cancelButton: {
+    padding: 6,
   },
   activitiesScrollView: {
     flex: 1,
@@ -535,8 +830,6 @@ const styles = StyleSheet.create({
     borderRadius: 10, // 與Dashboard卡片圓角一致
     padding: 15, // 與Dashboard卡片padding一致
     marginBottom: 10, // 與Dashboard一致
-    borderLeftWidth: 3,
-    borderLeftColor: '#00CED1',
   },
   activityIcon: {
     width: 32,
@@ -587,5 +880,44 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#A9A9A9',
     marginTop: 8,
+  },
+  moreButton: {
+    padding: 6,
+    marginRight: 6,
+  },
+  addButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#00CED1',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#00CED1',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  selectedActivityItem: {
+    backgroundColor: '#003842', // 深色青色背景表示選中
+  },
+  checkboxContainer: {
+    position: 'absolute',
+    left: 15,
+    top: '50%',
+    transform: [{ translateY: -12 }],
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  activityContentContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
 }); 

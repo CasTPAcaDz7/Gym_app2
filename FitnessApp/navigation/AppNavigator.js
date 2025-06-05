@@ -43,7 +43,7 @@ import ChatRoomScreen from '../screens/ChatRoomScreen';
 import CoachManageScreen from '../screens/CoachManageScreen';
 
 // 導入半圓形彈出組件
-import SemicirclePopup from '../components/SemicirclePopup';
+// import SemicirclePopup from '../components/SemicirclePopup';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -178,7 +178,30 @@ function CalendarStack() {
       <Stack.Screen 
         name="AddActivity" 
         component={AddActivityScreen} 
-        options={{ headerShown: false }}
+        options={{ 
+          headerShown: false,
+          gestureDirection: 'horizontal-inverted',
+          cardStyleInterpolator: ({ current, next, layouts }) => {
+            return {
+              cardStyle: {
+                transform: [
+                  {
+                    translateX: current.progress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [layouts.screen.width, 0],
+                    }),
+                  },
+                ],
+              },
+              overlayStyle: {
+                opacity: current.progress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 0.5],
+                }),
+              },
+            };
+          },
+        }}
       />
     </Stack.Navigator>
   );
@@ -226,46 +249,10 @@ function CommunityStack() {
   );
 }
 
-// 自定義TabBar組件，包含半圓形彈出功能
+// 自定義TabBar組件，移除半圓形彈出功能
 function CustomTabBar({ state, descriptors, navigation }) {
-  const [showSemicircle, setShowSemicircle] = React.useState(false);
-
-  // 檢查當前是否在Community頁面，並確保動畫正確執行
-  React.useEffect(() => {
-    const currentRoute = state.routes[state.index];
-    const isCommunityPage = currentRoute.name === 'Community';
-    
-    // 使用 setTimeout 確保動畫時序正確
-    if (isCommunityPage !== showSemicircle) {
-      if (isCommunityPage) {
-        // 進入Community頁面時，稍微延遲顯示半圓形工具欄
-        setTimeout(() => {
-          setShowSemicircle(true);
-        }, 100); // 減少延遲讓動畫更及時
-      } else {
-        // 離開Community頁面時，立即開始隱藏動畫
-        setShowSemicircle(false);
-      }
-    }
-  }, [state, showSemicircle]);
-
-  const handleChatPress = () => {
-    navigation.navigate('Community', { screen: 'ChatRoom' });
-  };
-
-  const handleCoachManagePress = () => {
-    navigation.navigate('Community', { screen: 'CoachManage' });
-  };
-
   return (
     <View style={{ position: 'relative' }}>
-      {/* 半圓形彈出組件 - 始終渲染以確保動畫完整 */}
-      <SemicirclePopup
-        isVisible={showSemicircle}
-        onChatPress={handleChatPress}
-        onCoachManagePress={handleCoachManagePress}
-      />
-      
       {/* 原始TabBar */}
       <View
         style={{
@@ -277,7 +264,6 @@ function CustomTabBar({ state, descriptors, navigation }) {
           paddingTop: 8,
           height: 70,
           position: 'relative',
-          zIndex: 1, // 確保TabBar在半圓形工具欄之下
         }}
       >
         {state.routes.map((route, index) => {
@@ -293,16 +279,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
             });
 
             if (!isFocused && !event.defaultPrevented) {
-              // 如果正在離開Community頁面，確保半圓形工具欄先開始隱藏動畫
-              if (state.routes[state.index].name === 'Community' && route.name !== 'Community') {
-                setShowSemicircle(false);
-                // 稍微延遲導航以確保動畫流暢
-                setTimeout(() => {
-                  navigation.navigate(route.name);
-                }, 50);
-              } else {
-                navigation.navigate(route.name);
-              }
+              navigation.navigate(route.name);
             }
           };
 
