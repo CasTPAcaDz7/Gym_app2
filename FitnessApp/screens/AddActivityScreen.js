@@ -29,7 +29,7 @@ export default function AddActivityScreen({ navigation, route }) {
   const [activityType, setActivityType] = useState(editActivity?.activityType || 'normal'); // 'normal' or 'fitness'
   const [selectedExercise, setSelectedExercise] = useState(editActivity?.selectedExercise || null);
   const [customExerciseName, setCustomExerciseName] = useState(editActivity?.customExerciseName || '');
-  const [trainingSets, setTrainingSets] = useState(editActivity?.trainingSets || []); // 訓練組數據
+  const [fitnessGroups, setFitnessGroups] = useState(editActivity?.fitnessGroups || []);
   const [isAllDay, setIsAllDay] = useState(editActivity?.isAllDay ?? true);
   const [startDate, setStartDate] = useState(editActivity ? new Date(editActivity.startDate) : selectedDate);
   const [endDate, setEndDate] = useState(editActivity ? new Date(editActivity.endDate) : selectedDate);
@@ -45,10 +45,21 @@ export default function AddActivityScreen({ navigation, route }) {
   const [showSuggestions, setShowSuggestions] = useState(false); // 是否顯示建議列表
   const [suggestedActivities, setSuggestedActivities] = useState([]); // 建議的活動列表
 
-  // 初始化效果 - 如果是編輯健身活動且沒有訓練組，創建預設訓練組
+  // 初始化效果 - 如果是編輯健身活動且沒有健身組，創建預設健身組
   useEffect(() => {
-    if (isEdit && editActivity?.activityType === 'fitness' && (!editActivity?.trainingSets || editActivity.trainingSets.length === 0)) {
-      createDefaultTrainingSets();
+    if (isEdit && editActivity?.activityType === 'fitness') {
+      // 兼容舊版本數據結構
+      if (editActivity?.trainingSets && editActivity.trainingSets.length > 0 && (!editActivity?.fitnessGroups || editActivity.fitnessGroups.length === 0)) {
+        // 將舊的 trainingSets 轉換為新的 fitnessGroups 格式
+        const defaultGroup = {
+          id: 'group_1',
+          name: editActivity.selectedExercise?.name || editActivity.customExerciseName || '健身項目 1',
+          trainingSets: editActivity.trainingSets
+        };
+        setFitnessGroups([defaultGroup]);
+      } else if (!editActivity?.fitnessGroups || editActivity.fitnessGroups.length === 0) {
+        createDefaultFitnessGroup();
+      }
     }
   }, [isEdit, editActivity]);
 
@@ -319,10 +330,19 @@ export default function AddActivityScreen({ navigation, route }) {
       return;
     }
 
-    // 如果是健身項目，確保已選擇或輸入健身項目
-    if (activityType === 'fitness' && !selectedExercise && !customExerciseName.trim()) {
-      Alert.alert('提示', '請選擇健身項目或輸入自定義健身項目名稱');
-      return;
+    // 如果是健身項目，確保有健身組且健身組有名稱
+    if (activityType === 'fitness') {
+      if (!fitnessGroups || fitnessGroups.length === 0) {
+        Alert.alert('提示', '請至少添加一個健身項目組');
+        return;
+      }
+      
+      // 檢查是否有空的健身組名稱
+      const hasEmptyGroupName = fitnessGroups.some(group => !group.name || !group.name.trim());
+      if (hasEmptyGroupName) {
+        Alert.alert('提示', '請為所有健身項目組輸入名稱');
+        return;
+      }
     }
 
     // 構建活動數據
@@ -331,7 +351,7 @@ export default function AddActivityScreen({ navigation, route }) {
       activityType,
       selectedExercise,
       customExerciseName,
-      trainingSets, // 添加訓練組數據
+      fitnessGroups,
       isAllDay,
       date: startDate.toISOString(), // 主要日期
       startDate: startDate.toISOString(),
@@ -438,12 +458,12 @@ export default function AddActivityScreen({ navigation, route }) {
     if (type === 'normal') {
       setSelectedExercise(null);
       setCustomExerciseName('');
-      setTrainingSets([]); // 切換到普通活動時清空訓練組
+      setFitnessGroups([]); // 切換到普通活動時清空健身組
     } else if (type === 'fitness') {
       // 移除自動填寫「標題」的邏輯，讓用戶看到placeholder
-      // 如果還沒有訓練組，創建預設的3個訓練組
-      if (trainingSets.length === 0) {
-        createDefaultTrainingSets();
+      // 如果還沒有健身組，創建預設的健身組
+      if (fitnessGroups.length === 0) {
+        createDefaultFitnessGroup();
       }
     }
   };
@@ -478,52 +498,133 @@ export default function AddActivityScreen({ navigation, route }) {
     );
   };
 
-  // 添加訓練組
-  const addTrainingSet = () => {
-    const newSet = {
-      id: Date.now().toString(),
-      setNumber: trainingSets.length + 1,
-      previousRecord: '—', // 上一次記錄，預設為破折號
-      weight: '', // 重量記錄
+  // 創建預設健身組（1個）
+  const createDefaultFitnessGroup = () => {
+    const defaultGroup = {
+      id: 'group_1',
+      name: '健身項目 1',
+      trainingSets: [
+        {
+          id: `set_1_1`,
+          setNumber: 1,
+          previousRecord: '—',
+          weight: '',
+        },
+        {
+          id: `set_1_2`,
+          setNumber: 2,
+          previousRecord: '—',
+          weight: '',
+        },
+        {
+          id: `set_1_3`,
+          setNumber: 3,
+          previousRecord: '—',
+          weight: '',
+        }
+      ],
     };
-    setTrainingSets([...trainingSets, newSet]);
+    setFitnessGroups([defaultGroup]);
   };
 
-  // 創建預設訓練組（3個）
-  const createDefaultTrainingSets = () => {
-    const defaultSets = Array.from({ length: 3 }, (_, index) => ({
-      id: `default_${Date.now()}_${index}`,
-      setNumber: index + 1,
-      previousRecord: '—',
-      weight: '',
-    }));
-    setTrainingSets(defaultSets);
-  };
-
-  // 更新訓練組重量
-  const updateTrainingSetWeight = (setId, weight) => {
-    setTrainingSets(trainingSets.map(set => 
-      set.id === setId ? { ...set, weight } : set
+  // 更新健身組名稱
+  const updateFitnessGroupName = (groupId, name) => {
+    setFitnessGroups(fitnessGroups.map(group => 
+      group.id === groupId ? { ...group, name } : group
     ));
   };
 
-  // 獲取建議重量（從已填寫的重量中取最後一個）
-  const getSuggestedWeight = (currentSetId) => {
-    const filledWeights = trainingSets
+  // 為特定健身組添加訓練組
+  const addTrainingSetToGroup = (groupId) => {
+    setFitnessGroups(fitnessGroups.map(group => {
+      if (group.id === groupId) {
+        const newSet = {
+          id: `set_${groupId}_${Date.now()}`,
+          setNumber: group.trainingSets.length + 1,
+          previousRecord: '—',
+          weight: '',
+        };
+        return { ...group, trainingSets: [...group.trainingSets, newSet] };
+      }
+      return group;
+    }));
+  };
+
+  // 更新特定健身組中的訓練組重量
+  const updateTrainingSetWeight = (groupId, setId, weight) => {
+    setFitnessGroups(fitnessGroups.map(group => {
+      if (group.id === groupId) {
+        return {
+          ...group,
+          trainingSets: group.trainingSets.map(set => 
+            set.id === setId ? { ...set, weight } : set
+          )
+        };
+      }
+      return group;
+    }));
+  };
+
+  // 從特定健身組中刪除訓練組
+  const removeTrainingSetFromGroup = (groupId, setId) => {
+    setFitnessGroups(fitnessGroups.map(group => {
+      if (group.id === groupId) {
+        const newSets = group.trainingSets.filter(set => set.id !== setId);
+        // 重新編號
+        const reNumberedSets = newSets.map((set, index) => ({
+          ...set,
+          setNumber: index + 1
+        }));
+        return { ...group, trainingSets: reNumberedSets };
+      }
+      return group;
+    }));
+  };
+
+  // 獲取建議重量（從該組的其他訓練組中取最後一個）
+  const getSuggestedWeight = (groupId, currentSetId) => {
+    const group = fitnessGroups.find(g => g.id === groupId);
+    if (!group) return '';
+    
+    const filledWeights = group.trainingSets
       .filter(set => set.id !== currentSetId && set.weight.trim() !== '')
       .map(set => set.weight);
     return filledWeights.length > 0 ? filledWeights[filledWeights.length - 1] : '';
   };
 
-  // 刪除訓練組
-  const removeTrainingSet = (setId) => {
-    const newSets = trainingSets.filter(set => set.id !== setId);
-    // 重新編號
-    const reNumberedSets = newSets.map((set, index) => ({
-      ...set,
-      setNumber: index + 1
-    }));
-    setTrainingSets(reNumberedSets);
+  // 添加健身組
+  const addFitnessGroup = () => {
+    const newGroup = {
+      id: `group_${Date.now()}`,
+      name: `健身項目 ${fitnessGroups.length + 1}`,
+      trainingSets: [
+        {
+          id: `set_${Date.now()}_1`,
+          setNumber: 1,
+          previousRecord: '—',
+          weight: '',
+        },
+        {
+          id: `set_${Date.now()}_2`,
+          setNumber: 2,
+          previousRecord: '—',
+          weight: '',
+        },
+        {
+          id: `set_${Date.now()}_3`,
+          setNumber: 3,
+          previousRecord: '—',
+          weight: '',
+        }
+      ],
+    };
+    setFitnessGroups([...fitnessGroups, newGroup]);
+  };
+
+  // 刪除健身組
+  const removeFitnessGroup = (groupId) => {
+    const newGroups = fitnessGroups.filter(group => group.id !== groupId);
+    setFitnessGroups(newGroups);
   };
 
   // 搜尋相似活動
@@ -574,16 +675,16 @@ export default function AddActivityScreen({ navigation, route }) {
     setActivityType(suggestedActivity.activityType || 'normal');
     setSelectedExercise(suggestedActivity.selectedExercise || null);
     setCustomExerciseName(suggestedActivity.customExerciseName || '');
-    setTrainingSets(suggestedActivity.trainingSets || []);
+    setFitnessGroups(suggestedActivity.fitnessGroups || []);
     setIsAllDay(suggestedActivity.isAllDay ?? true);
     setStartTime(suggestedActivity.startTime || { hour: 9, minute: 0 });
     setEndTime(suggestedActivity.endTime || { hour: 10, minute: 0 });
     setReminderSettings(suggestedActivity.reminderSettings || ['當天', '1天前']);
     setSelectedColor(suggestedActivity.color || '#FF4444');
     
-    // 如果是健身項目但沒有訓練組，創建預設訓練組
-    if ((suggestedActivity.activityType === 'fitness') && (!suggestedActivity.trainingSets || suggestedActivity.trainingSets.length === 0)) {
-      createDefaultTrainingSets();
+    // 如果是健身項目但沒有健身組，創建預設健身組
+    if ((suggestedActivity.activityType === 'fitness') && (!suggestedActivity.fitnessGroups || suggestedActivity.fitnessGroups.length === 0)) {
+      createDefaultFitnessGroup();
     }
     
     // 隱藏建議列表
@@ -622,38 +723,14 @@ export default function AddActivityScreen({ navigation, route }) {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* 標題輸入區 */}
         <View style={styles.section}>
-          {activityType === 'fitness' ? (
-            // 健身項目模式：標題框右側有下拉選單按鈕
-            <View style={styles.titleWithDropdownContainer}>
-              <TextInput
-                style={styles.titleInputWithDropdown}
-                placeholder="標題"
-                placeholderTextColor="#888888"
-                value={title}
-                onChangeText={handleTitleChange}
-                maxLength={100}
-              />
-              <TouchableOpacity 
-                style={styles.titleDropdownButton}
-                onPress={() => {
-                  setSearchQuery(''); // 每次打開時清空搜尋
-                  setShowExerciseModal(true);
-                }}
-              >
-                <MaterialCommunityIcons name="menu-down" size={24} color={selectedColor} />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            // 普通活動模式：標準標題輸入框
-            <TextInput
-              style={styles.titleInput}
-              placeholder="標題"
-              placeholderTextColor="#888888"
-              value={title}
-              onChangeText={handleTitleChange}
-              maxLength={100}
-            />
-          )}
+          <TextInput
+            style={styles.titleInput}
+            placeholder="標題"
+            placeholderTextColor="#888888"
+            value={title}
+            onChangeText={handleTitleChange}
+            maxLength={100}
+          />
           
           {/* 智能建議列表 */}
           {showSuggestions && suggestedActivities.length > 0 && (
@@ -744,72 +821,131 @@ export default function AddActivityScreen({ navigation, route }) {
         {activityType === 'fitness' && (
           <View style={styles.section}>
             <View style={styles.fitnessSection}>
-              {/* 訓練組管理區域 */}
-              <View style={styles.trainingSetsContainer}>
-                {/* 表頭區域 - 包含添加按鈕 */}
-                <View style={styles.trainingSetsHeader}>
-                  <View style={styles.trainingSetsTableHeader}>
-                    <View style={styles.setNumberHeaderContainer}>
-                      <Text style={styles.tableHeaderText}>訓練組</Text>
-                    </View>
-                    <View style={styles.previousRecordHeaderContainer}>
-                      <Text style={styles.tableHeaderText}>上一次</Text>
-                    </View>
-                    <View style={styles.weightHeaderContainer}>
-                      <Text style={styles.tableHeaderText}>重量</Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity 
-                    style={[styles.addSetButtonTopRight, { backgroundColor: selectedColor }]}
-                    onPress={addTrainingSet}
-                  >
-                    <MaterialCommunityIcons name="plus" size={16} color="#ffffff" />
-                  </TouchableOpacity>
+              {/* 健身組標題區域 */}
+              <View style={styles.fitnessSectionHeader}>
+                <View style={styles.fitnessSectionTitleContainer}>
+                  <MaterialCommunityIcons name="dumbbell" size={20} color={selectedColor} />
+                  <Text style={styles.fitnessSectionTitle}>健身項目組</Text>
                 </View>
+                <TouchableOpacity 
+                  style={[styles.addFitnessGroupButton, { backgroundColor: selectedColor }]}
+                  onPress={addFitnessGroup}
+                >
+                  <MaterialCommunityIcons name="plus" size={16} color="#ffffff" />
+                  <Text style={styles.addFitnessGroupButtonText}>新增</Text>
+                </TouchableOpacity>
+              </View>
 
-                {/* 訓練組列表 */}
-                {trainingSets.length > 0 ? (
-                  trainingSets.map((set) => (
-                    <View key={set.id} style={styles.trainingSetRow}>
-                      <View style={styles.setNumberContainer}>
-                        <Text style={styles.setNumber}>{set.setNumber}</Text>
-                      </View>
-                      
-                      <View style={styles.previousRecordContainer}>
-                        <Text style={styles.previousRecord}>{set.previousRecord}</Text>
-                      </View>
-                      
-                      <View style={styles.weightContainer}>
-                        <View style={styles.weightInputWrapper}>
-                          <TextInput
-                            style={styles.weightInput}
-                            value={set.weight}
-                            onChangeText={(text) => updateTrainingSetWeight(set.id, text)}
-                            maxLength={20}
-                          />
-                          {set.weight.trim() === '' && getSuggestedWeight(set.id) && (
-                            <Text style={styles.suggestedWeight}>
-                              {getSuggestedWeight(set.id)}
-                            </Text>
-                          )}
-                        </View>
+              {/* 健身組列表 */}
+              {fitnessGroups.length > 0 ? (
+                fitnessGroups.map((group, groupIndex) => (
+                  <View key={group.id} style={styles.fitnessGroupContainer}>
+                    {/* 健身組標題和操作 */}
+                    <View style={styles.fitnessGroupHeader}>
+                      <TextInput
+                        style={styles.fitnessGroupNameInput}
+                        value={group.name}
+                        onChangeText={(text) => updateFitnessGroupName(group.id, text)}
+                        placeholder="健身項目名稱"
+                        placeholderTextColor="#888888"
+                        maxLength={50}
+                      />
+                      <View style={styles.fitnessGroupActions}>
                         <TouchableOpacity 
-                          style={styles.removeSetButton}
-                          onPress={() => removeTrainingSet(set.id)}
+                          style={[styles.addTrainingSetButton, { backgroundColor: selectedColor }]}
+                          onPress={() => addTrainingSetToGroup(group.id)}
                         >
-                          <MaterialCommunityIcons name="close" size={16} color="#FF4444" />
+                          <MaterialCommunityIcons name="plus" size={14} color="#ffffff" />
                         </TouchableOpacity>
+                        {fitnessGroups.length > 1 && (
+                          <TouchableOpacity 
+                            style={styles.removeFitnessGroupButton}
+                            onPress={() => removeFitnessGroup(group.id)}
+                          >
+                            <MaterialCommunityIcons name="trash-can" size={14} color="#FF4444" />
+                          </TouchableOpacity>
+                        )}
                       </View>
                     </View>
-                  ))
-                ) : (
-                  <View style={styles.emptyTrainingSets}>
-                    <MaterialCommunityIcons name="dumbbell" size={48} color="#4A5657" />
-                    <Text style={styles.emptyTrainingSetsText}>載入預設訓練組中...</Text>
-                    <Text style={styles.emptyTrainingSetsSubtext}>即將為您準備3個預設訓練組</Text>
+
+                    {/* 訓練組表格標題 */}
+                    <View style={styles.trainingSetsTableHeader}>
+                      <View style={styles.setNumberHeaderContainer}>
+                        <Text style={styles.tableHeaderText}>組別</Text>
+                      </View>
+                      <View style={styles.previousRecordHeaderContainer}>
+                        <Text style={styles.tableHeaderText}>上次記錄</Text>
+                      </View>
+                      <View style={styles.weightHeaderContainer}>
+                        <Text style={styles.tableHeaderText}>本次重量</Text>
+                      </View>
+                      <View style={styles.actionHeaderContainer}>
+                        <Text style={styles.tableHeaderText}>操作</Text>
+                      </View>
+                    </View>
+
+                    {/* 訓練組列表 */}
+                    {group.trainingSets.map((set) => (
+                      <View key={set.id} style={styles.trainingSetRow}>
+                        <View style={styles.setNumberContainer}>
+                          <Text style={styles.setNumber}>{set.setNumber}</Text>
+                        </View>
+                        
+                        <View style={styles.previousRecordContainer}>
+                          <Text style={styles.previousRecord}>{set.previousRecord}</Text>
+                        </View>
+                        
+                        <View style={styles.weightContainer}>
+                          <View style={styles.weightInputWrapper}>
+                            <TextInput
+                              style={styles.weightInput}
+                              value={set.weight}
+                              onChangeText={(text) => updateTrainingSetWeight(group.id, set.id, text)}
+                              placeholder="重量"
+                              placeholderTextColor="#666666"
+                              maxLength={20}
+                            />
+                            {set.weight.trim() === '' && getSuggestedWeight(group.id, set.id) && (
+                              <Text style={styles.suggestedWeight}>
+                                {getSuggestedWeight(group.id, set.id)}
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+
+                        <View style={styles.actionContainer}>
+                          <TouchableOpacity 
+                            style={styles.removeSetButton}
+                            onPress={() => removeTrainingSetFromGroup(group.id, set.id)}
+                          >
+                            <MaterialCommunityIcons name="close" size={16} color="#FF4444" />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+
+                    {/* 如果該組沒有訓練組 */}
+                    {group.trainingSets.length === 0 && (
+                      <View style={styles.emptyTrainingSets}>
+                        <MaterialCommunityIcons name="dumbbell" size={24} color="#4A5657" />
+                        <Text style={styles.emptyTrainingSetsText}>尚未添加訓練組</Text>
+                        <Text style={styles.emptyTrainingSetsSubtext}>點擊上方+號添加訓練組</Text>
+                      </View>
+                    )}
+
+                    {/* 組之間的分隔線 */}
+                    {groupIndex < fitnessGroups.length - 1 && (
+                      <View style={styles.groupDivider} />
+                    )}
                   </View>
-                )}
-              </View>
+                ))
+              ) : (
+                <View style={styles.emptyFitnessGroups}>
+                  <MaterialCommunityIcons name="dumbbell" size={48} color="#4A5657" />
+                  <Text style={styles.emptyFitnessGroupsText}>載入預設健身組中...</Text>
+                  <Text style={styles.emptyFitnessGroupsSubtext}>即將為您準備1個預設健身組</Text>
+                </View>
+              )}
             </View>
           </View>
         )}
@@ -1406,15 +1542,75 @@ const styles = StyleSheet.create({
   fitnessSection: {
     padding: 16,
   },
-  trainingSetsContainer: {
-    flex: 1,
-  },
-  trainingSetsHeader: {
+  fitnessSectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 12,
-    position: 'relative',
+  },
+  fitnessSectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  fitnessSectionTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 8,
+  },
+  addFitnessGroupButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  addFitnessGroupButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  fitnessGroupContainer: {
+    marginBottom: 16,
+  },
+  fitnessGroupHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingHorizontal: 16,
+  },
+  fitnessGroupNameInput: {
+    flex: 0.7,
+    color: '#ffffff',
+    fontSize: 16,
+    backgroundColor: 'transparent',
+    borderBottomWidth: 1,
+    borderBottomColor: '#4A5657',
+    paddingVertical: 8,
+    paddingHorizontal: 0,
+  },
+  fitnessGroupActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 16,
+  },
+  addTrainingSetButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  removeFitnessGroupButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 68, 68, 0.2)',
   },
   trainingSetsTableHeader: {
     flexDirection: 'row',
@@ -1440,11 +1636,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 40, // 為刪除按鈕留出空間 (8 + 32)
   },
+  tableHeaderText: {
+    color: '#A9A9A9',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  actionHeaderContainer: {
+    width: 40,
+    alignItems: 'center',
+  },
   trainingSetRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 8,
     marginBottom: 8,
+    paddingHorizontal: 16,
   },
   setNumberContainer: {
     width: 50,
@@ -1494,16 +1701,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   suggestedWeight: {
-    position: 'absolute',
-    left: 8,
-    right: 8,
-    top: 10,
-    bottom: 10,
-    color: '#666666',
+    color: '#A9A9A9',
     fontSize: 14,
     textAlign: 'center',
-    textAlignVertical: 'center',
-    pointerEvents: 'none', // 防止干擾輸入
+  },
+  actionContainer: {
+    width: 32,
+    alignItems: 'center',
   },
   removeSetButton: {
     padding: 8,
@@ -1513,6 +1717,7 @@ const styles = StyleSheet.create({
   emptyTrainingSets: {
     alignItems: 'center',
     paddingVertical: 40,
+    paddingHorizontal: 16,
   },
   emptyTrainingSetsText: {
     color: '#A9A9A9',
@@ -1526,60 +1731,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
-  noResultsContainer: {
+  emptyFitnessGroups: {
     alignItems: 'center',
     paddingVertical: 40,
   },
-  noResultsText: {
+  emptyFitnessGroupsText: {
     color: '#A9A9A9',
     fontSize: 16,
     fontWeight: '600',
     marginTop: 12,
     marginBottom: 6,
   },
-  noResultsSubtext: {
+  emptyFitnessGroupsSubtext: {
     color: '#666666',
     fontSize: 14,
     textAlign: 'center',
   },
-  addSetButtonTopRight: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'absolute',
-    top: 0,
-    right: 0,
-  },
-  tableHeaderText: {
-    color: '#A9A9A9',
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  titleWithDropdownContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#4A5657',
-    borderRadius: 8,
-    backgroundColor: '#2E3A3B',
-  },
-  titleInputWithDropdown: {
-    flex: 1,
-    color: '#ffffff',
-    fontSize: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    fontWeight: '500',
-    backgroundColor: 'transparent',
-  },
-  titleDropdownButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 16,
-    borderLeftWidth: 1,
-    borderLeftColor: '#4A5657',
+  groupDivider: {
+    height: 1,
+    backgroundColor: '#4A5657',
+    marginVertical: 16,
+    marginHorizontal: 16,
   },
   suggestionsContainer: {
     marginTop: 8,

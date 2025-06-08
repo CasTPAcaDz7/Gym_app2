@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { View, Alert, TouchableOpacity } from 'react-native';
+import { View, Alert, TouchableOpacity, Animated, Dimensions } from 'react-native';
 
 // 導入各個頁面組件
 import CalendarScreen from '../screens/CalendarScreen';
@@ -35,12 +35,17 @@ import WeightInScreen from '../screens/WeightInScreen';
 // 導入新的Exercise頁面
 import ExerciseScreen from '../screens/ExerciseScreen';
 
+// 導入今日健身訓練頁面
+import TodayWorkoutScreen from '../screens/TodayWorkoutScreen';
+
 // 導入個人檔案頁面
 import ProfileScreen from '../screens/ProfileScreen';
 
 // 導入新增的聊天室和教練管理頁面
 import ChatRoomScreen from '../screens/ChatRoomScreen';
 import CoachManageScreen from '../screens/CoachManageScreen';
+import PhotoCropScreen from '../screens/PhotoCropScreen';
+import FindCoachScreen from '../screens/FindCoachScreen';
 
 // 導入半圓形彈出組件
 // import SemicirclePopup from '../components/SemicirclePopup';
@@ -148,6 +153,11 @@ function DashboardStack() {
         component={ExerciseScreen} 
         options={{ headerShown: false }}
       />
+      <Stack.Screen 
+        name="TodayWorkout" 
+        component={TodayWorkoutScreen} 
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 }
@@ -245,11 +255,21 @@ function CommunityStack() {
         component={CoachManageScreen} 
         options={{ headerShown: false }}
       />
+      <Stack.Screen 
+        name="PhotoCrop" 
+        component={PhotoCropScreen} 
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="FindCoach" 
+        component={FindCoachScreen} 
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 }
 
-// 自定義TabBar組件，移除半圓形彈出功能
+// 自定義TabBar組件，移除動畫邏輯
 function CustomTabBar({ state, descriptors, navigation }) {
   return (
     <View style={{ position: 'relative' }}>
@@ -279,7 +299,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
             });
 
             if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
+                navigation.navigate(route.name);
             }
           };
 
@@ -320,6 +340,29 @@ function CustomTabBar({ state, descriptors, navigation }) {
     </View>
   );
 }
+
+// 創建一個全局動畫控制器
+const AnimationController = {
+  slideAnimation: null,
+  initAnimation: function() {
+    if (!this.slideAnimation) {
+      this.slideAnimation = new Animated.Value(0);
+    }
+    return this.slideAnimation;
+  },
+  triggerSlideFromRight: function() {
+    if (this.slideAnimation) {
+      this.slideAnimation.setValue(1);
+      Animated.timing(this.slideAnimation, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }
+};
+
+export { AnimationController };
 
 export default function AppNavigator() {
   return (

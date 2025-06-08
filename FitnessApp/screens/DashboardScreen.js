@@ -10,6 +10,7 @@ import {
   Alert,
   SafeAreaView,
   StatusBar,
+  Animated,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useStats, useFoodRecords, useExerciseRecords, useWeightRecords } from '../hooks/useStorage';
@@ -22,7 +23,12 @@ export default function DashboardScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [currentWeek, setCurrentWeek] = useState([]);
   const [todayWorkouts, setTodayWorkouts] = useState([]);
+  const [todayFitnessActivities, setTodayFitnessActivities] = useState([]);
   const [dailyComment, setDailyComment] = useState('');
+  
+  // 添加動畫狀態
+  const [slideAnimation] = useState(new Animated.Value(0));
+  const [showAnimationOverlay, setShowAnimationOverlay] = useState(false);
   
   // 使用自定義Hooks獲取數據
   const { todayOverview, weeklyStats, refreshStats } = useStats();
@@ -42,6 +48,7 @@ export default function DashboardScreen({ navigation }) {
   useFocusEffect(
     React.useCallback(() => {
       refreshStats();
+      loadTodayFitnessData(); // 重新載入今日健身數據
       loadWeekActivities(); // 添加活動數據刷新
     }, [refreshStats])
   );
@@ -70,13 +77,8 @@ export default function DashboardScreen({ navigation }) {
       }
       setCurrentWeek(week);
 
-      // 模擬今日運動計劃（可以後續從真實數據獲取）
-      setTodayWorkouts([
-        { id: 1, training: 'Chest Press', weight: '150 kg', sets: 4, reps: 20, completed: false },
-        { id: 2, training: 'Bench Press', weight: '150 kg', sets: 4, reps: 12, completed: false },
-        { id: 3, training: 'Cable chest fly', weight: '150 kg', sets: 5, reps: 12, completed: false },
-        { id: 4, training: 'Cable Crossover', weight: '150 kg', sets: 3, reps: 16, completed: false },
-      ]);
+      // 載入今日健身活動數據
+      await loadTodayFitnessData();
 
       generateDailyComment();
 
@@ -91,6 +93,69 @@ export default function DashboardScreen({ navigation }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  // 載入今日健身活動數據
+  const loadTodayFitnessData = async () => {
+    try {
+      const today = new Date();
+      const activities = await loadActivitiesByDate(today);
+      
+      // 過濾出健身項目活動
+      const fitnessActivities = activities.filter(
+        activity => activity.activityType === 'fitness' || activity.type === 'fitness'
+      );
+      
+      setTodayFitnessActivities(fitnessActivities);
+      
+      // 轉換健身活動為workout格式以供表格顯示
+      const workoutSummary = [];
+      fitnessActivities.forEach(activity => {
+        if (activity.fitnessGroups && activity.fitnessGroups.length > 0) {
+          activity.fitnessGroups.forEach(group => {
+            // 計算該組的歷史最大重量
+            const maxWeight = getMaxWeightFromGroup(group);
+            const totalSets = group.trainingSets ? group.trainingSets.length : 0;
+            
+            workoutSummary.push({
+              id: `${activity.id}_${group.id}`,
+              training: group.name,
+              weight: maxWeight ? `${maxWeight} kg` : '—',
+              sets: totalSets,
+              reps: '—', // 健身組目前不記錄次數
+              completed: false,
+              activityId: activity.id,
+              groupId: group.id,
+            });
+          });
+        }
+      });
+      
+      setTodayWorkouts(workoutSummary);
+    } catch (error) {
+      console.error('載入今日健身數據失敗:', error);
+      setTodayFitnessActivities([]);
+      setTodayWorkouts([]);
+    }
+  };
+
+  // 獲取健身組的歷史最大重量
+  const getMaxWeightFromGroup = (group) => {
+    if (!group.trainingSets || group.trainingSets.length === 0) return null;
+    
+    const weights = group.trainingSets
+      .map(set => {
+        const weight = set.weight || set.previousRecord;
+        if (weight && weight !== '—') {
+          // 提取數字部分
+          const num = parseFloat(weight.replace(/[^\d.]/g, ''));
+          return isNaN(num) ? 0 : num;
+        }
+        return 0;
+      })
+      .filter(w => w > 0);
+    
+    return weights.length > 0 ? Math.max(...weights) : null;
   };
 
   // 載入週活動數據
@@ -233,40 +298,70 @@ export default function DashboardScreen({ navigation }) {
     </View>
   );
 
-  const renderTodayWorkouts = () => (
-    <View style={styles.card}>
+  const renderTodayWorkouts = () => {
+    return (
+      <TouchableOpacity 
+        style={styles.card}
+        onPress={() => {
+          if (todayFitnessActivities && todayFitnessActivities.length > 0) {
+            // 有健身活動時，導航到TodayWorkout頁面
+            navigation.navigate('TodayWorkout', { 
+              todayFitnessActivities: todayFitnessActivities 
+            });
+          } else {
+            // 沒有健身活動時，使用滑動動畫導航到月曆Tab
+            handleSlideToCalendar();
+          }
+        }}
+        activeOpacity={0.7}
+      >
+        <View style={styles.workoutCardHeader}>
       <Text style={styles.sectionTitle}>Today Workouts</Text>
+          <MaterialCommunityIcons name="chevron-right" size={20} color="#A9A9A9" />
+        </View>
+        
+        {todayFitnessActivities && todayFitnessActivities.length > 0 ? (
+          // 有健身活動時顯示表格
+          <>
       <View style={styles.tableHeader}>
         <Text style={[styles.tableHeaderText, { flex: 2, textAlign: 'left' }]}>Training</Text>
-        <Text style={[styles.tableHeaderText, { flex: 1 }]}>Weight</Text>
-        <Text style={[styles.tableHeaderText, { flex: 1 }]}>No. of Set</Text>
-        <Text style={[styles.tableHeaderText, { flex: 1 }]}>No. of Reps</Text>
-        <View style={{ flex: 1 }}></View>
+              <Text style={[styles.tableHeaderText, { flex: 1 }]}>Max Weight</Text>
+              <Text style={[styles.tableHeaderText, { flex: 1 }]}>Sets</Text>
+              <Text style={[styles.tableHeaderText, { flex: 1 }]}>Status</Text>
       </View>
-      {todayWorkouts.map((workout) => (
+            
+            {todayWorkouts.slice(0, 4).map((workout) => (
         <View key={workout.id} style={styles.tableRow}>
-          <Text style={[styles.tableCell, { flex: 2, textAlign: 'left' }]}>{workout.training}</Text>
+                <Text style={[styles.tableCell, { flex: 2, textAlign: 'left' }]} numberOfLines={1}>
+                  {workout.training}
+                </Text>
           <Text style={[styles.tableCell, { flex: 1 }]}>{workout.weight}</Text>
           <Text style={[styles.tableCell, { flex: 1 }]}>{workout.sets}</Text>
-          <Text style={[styles.tableCell, { flex: 1 }]}>{workout.reps}</Text>
           <View style={{ flex: 1, alignItems: 'center' }}>
-            <TouchableOpacity
-              style={[
-                styles.doneButton,
-                workout.completed && styles.completedButton,
-              ]}
-              onPress={() => !workout.completed && markWorkoutComplete(workout.id)}
-              disabled={workout.completed}
-            >
-              <Text style={styles.doneButtonText}>
-                {workout.completed ? 'COMPLETED' : 'DONE'}
-              </Text>
-            </TouchableOpacity>
+                  <View style={styles.statusIndicator}>
+                    <MaterialCommunityIcons name="clock-outline" size={16} color="#A9A9A9" />
+                  </View>
           </View>
         </View>
       ))}
+            
+            {todayWorkouts.length > 4 && (
+              <View style={styles.moreItemsIndicator}>
+                <Text style={styles.moreItemsText}>還有 {todayWorkouts.length - 4} 個項目...</Text>
+              </View>
+            )}
+          </>
+        ) : (
+          // 沒有健身活動時顯示空狀態
+          <View style={styles.emptyWorkoutContainer}>
+            <MaterialCommunityIcons name="dumbbell" size={48} color="#4A5657" />
+            <Text style={styles.emptyWorkoutText}>今天沒有健身計劃</Text>
+            <Text style={styles.emptyWorkoutSubtext}>點擊前往月曆添加健身活動</Text>
     </View>
+        )}
+      </TouchableOpacity>
   );
+  };
 
   const renderSimpleCharts = () => {
     return (
@@ -335,6 +430,29 @@ export default function DashboardScreen({ navigation }) {
     </View>
   );
 
+  // 處理滑動動畫並導航到月曆
+  const handleSlideToCalendar = () => {
+    setShowAnimationOverlay(true);
+    
+    Animated.timing(slideAnimation, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      // 動畫完成後導航到月曆並隱藏遮罩
+      navigation.getParent()?.navigate('Calendar', {
+        screen: 'CalendarMain',
+        params: { selectedDate: new Date().toISOString().split('T')[0] }
+      });
+      
+      // 重置動畫和隱藏遮罩
+      setTimeout(() => {
+        slideAnimation.setValue(0);
+        setShowAnimationOverlay(false);
+      }, 100);
+    });
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -357,6 +475,23 @@ export default function DashboardScreen({ navigation }) {
           {renderSimpleCharts()}
         </View>
       </View>
+      
+      {/* 滑動動畫遮罩層 */}
+      {showAnimationOverlay && (
+        <Animated.View
+          style={[
+            styles.animationOverlay,
+            {
+              transform: [{
+                translateX: slideAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [Dimensions.get('window').width, 0],
+                })
+              }]
+            }
+          ]}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -598,5 +733,52 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '500',
     marginLeft: 8,
+  },
+  workoutCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  statusIndicator: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#A9A9A9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  moreItemsIndicator: {
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  moreItemsText: {
+    color: '#A9A9A9',
+  },
+  emptyWorkoutContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  emptyWorkoutText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  emptyWorkoutSubtext: {
+    color: '#A9A9A9',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  animationOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#1C2526',
+    zIndex: 1000,
   },
 }); 
